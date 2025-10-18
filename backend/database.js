@@ -13,7 +13,9 @@ async function openDb() {
       name TEXT NOT NULL,
       whatsappNumber TEXT NOT NULL,
       email TEXT NOT NULL UNIQUE,
-      password TEXT NOT NULL
+      password TEXT NOT NULL,
+      stripe_customer_id TEXT,
+      subscription_status TEXT DEFAULT 'free'
     );
 
     CREATE TABLE IF NOT EXISTS lookbooks (

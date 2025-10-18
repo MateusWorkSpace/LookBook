@@ -13,6 +13,7 @@
     "jsonwebtoken": "^9.0.2",
     "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
+    "stripe": "^15.8.0",
     "uuid": "^9.0.1"
   }
 }

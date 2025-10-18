@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import type { Lookbook } from '../types';
+import type { Lookbook, ShopperProfile } from '../types';
 import { API_BASE_URL } from '../App';
 import { ShareIcon, EditIcon, DeleteIcon } from '../components/icons';
 
 interface DashboardProps {
   navigate: (view: string, id?: string) => void;
   token: string;
+  profile: ShopperProfile;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ navigate, token }) => {
+const Dashboard: React.FC<DashboardProps> = ({ navigate, token, profile }) => {
   const [lookbooks, setLookbooks] = useState<Lookbook[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showShareModal, setShowShareModal] = useState<Lookbook | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     const fetchLookbooks = async () => {
@@ -67,20 +69,68 @@ const Dashboard: React.FC<DashboardProps> = ({ navigate, token }) => {
     });
   };
 
+  const handleUpgrade = async () => {
+    setIsRedirecting(true);
+    try {
+        const response = await fetch(`${API_BASE_URL}/create-checkout-session`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+        const data = await response.json();
+        if (data.url) {
+            window.location.href = data.url;
+        } else {
+            throw new Error(data.error || "Não foi possível iniciar o checkout.");
+        }
+    } catch (err) {
+        alert(err instanceof Error ? err.message : 'Ocorreu um erro ao tentar fazer o upgrade.');
+        setIsRedirecting(false);
+    }
+  };
+
   if (loading) return <div>Carregando...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
 
+  const canCreateLookbook = profile.subscription_status === 'pro' || lookbooks.length < 3;
+
   return (
     <div>
+       {profile.subscription_status === 'free' && (
+         <div className="bg-luxelink-800 text-white p-6 rounded-lg mb-8 shadow-lg flex flex-col md:flex-row justify-between items-center">
+            <div>
+                <h2 className="text-2xl font-bold">Passe para o Plano Pro!</h2>
+                <p className="text-luxelink-200 mt-1">Crie lookbooks ilimitados, remova a nossa marca e muito mais.</p>
+            </div>
+            <button 
+                onClick={handleUpgrade} 
+                disabled={isRedirecting}
+                className="bg-luxelink-600 hover:bg-luxelink-500 text-white font-bold py-3 px-6 rounded-lg text-lg transition-colors duration-300 mt-4 md:mt-0 disabled:bg-gray-500 disabled:cursor-wait"
+            >
+                {isRedirecting ? 'Redirecionando...' : 'Fazer Upgrade Agora'}
+            </button>
+         </div>
+       )}
+
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Seus Lookbooks</h1>
         <button
           onClick={() => navigate('create')}
-          className="bg-brand-teal-green text-white px-5 py-2 rounded-lg font-semibold hover:bg-brand-dark-green transition-colors"
+          disabled={!canCreateLookbook}
+          className="bg-brand-teal-green text-white px-5 py-2 rounded-lg font-semibold hover:bg-brand-dark-green transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+          title={!canCreateLookbook ? "Faça upgrade para o plano Pro para criar mais lookbooks." : "Criar Novo Lookbook"}
         >
           Criar Novo Lookbook
         </button>
       </div>
+
+      {!canCreateLookbook && lookbooks.length > 0 && (
+          <div className="text-center p-4 mb-6 bg-yellow-100 text-yellow-800 border border-yellow-300 rounded-lg">
+              Você atingiu o limite de 3 lookbooks do plano gratuito. <button onClick={handleUpgrade} className="font-bold underline hover:text-yellow-900">Faça upgrade para o Pro</button> para criar mais.
+          </div>
+      )}
 
       {lookbooks.length === 0 ? (
         <div className="text-center py-10 bg-white rounded-xl shadow-lg">

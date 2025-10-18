@@ -1,4 +1,3 @@
-
 export interface LookbookItem {
   id: string;
   imageUrl: string;
@@ -19,4 +18,5 @@ export interface ShopperProfile {
   name: string;
   whatsappNumber: string;
   email: string;
+  subscription_status?: 'free' | 'pro';
 }

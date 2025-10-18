@@ -10,6 +10,9 @@ import LookbookClientView from './views/LookbookClientView';
 import Login from './views/Login';
 import Register from './views/Register';
 import Landing from './views/Landing';
+import PaymentSuccess from './views/PaymentSuccess';
+import PaymentCancel from './views/PaymentCancel';
+
 
 export const API_BASE_URL = 'http://localhost:3001/api';
 
@@ -22,6 +25,8 @@ const App: React.FC = () => {
   const navigate = (newView: string, id: string | null = null) => {
     setCurrentLookbookId(id);
     setView(newView);
+    // Remove query params on navigation
+    window.history.pushState({}, '', window.location.pathname);
   };
 
   const handleLogout = useCallback(() => {
@@ -91,16 +96,23 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const path = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    
     if (path.startsWith('/lookbook/')) {
         const id = path.split('/')[2];
         navigate('view', id);
-    } else if (token) {
+    } else if (path.startsWith('/payment/success')) {
+        navigate('paymentSuccess');
+    } else if (path.startsWith('/payment/cancel')) {
+        navigate('paymentCancel');
+    }
+    else if (token) {
         if (!profile) fetchProfile();
         if (['landing', 'login', 'register'].includes(view)) {
           navigate('dashboard');
         }
     } else {
-        const publicViews = ['landing', 'login', 'register'];
+        const publicViews = ['landing', 'login', 'register', 'paymentSuccess', 'paymentCancel'];
         if (!publicViews.includes(view) && !view.startsWith('view')) {
             navigate('landing');
         }
@@ -131,15 +143,19 @@ const App: React.FC = () => {
   const renderView = () => {
     switch (view) {
       case 'dashboard':
-        return <Dashboard navigate={navigate} token={token} />;
+        return <Dashboard navigate={navigate} token={token} profile={profile} />;
       case 'settings':
         return <Settings profile={profile} setProfile={updateProfile} />;
       case 'create':
         return <CreateLookbook navigate={navigate} addLookbook={addLookbook} />;
       case 'edit':
         return <EditLookbook lookbookId={currentLookbookId} navigate={navigate} token={token} />;
+      case 'paymentSuccess':
+        return <PaymentSuccess navigate={navigate}/>;
+      case 'paymentCancel':
+        return <PaymentCancel navigate={navigate}/>;
       default:
-        return <Dashboard navigate={navigate} token={token} />;
+        return <Dashboard navigate={navigate} token={token} profile={profile} />;
     }
   };
 
