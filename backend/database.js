@@ -9,9 +9,11 @@ async function openDb() {
 }
 
 async function initializeDb(db) {
-  const profileSchema = `
-    CREATE TABLE IF NOT EXISTS profiles (
-      id INTEGER PRIMARY KEY NOT NULL,
+  const userSchema = `
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT UNIQUE NOT NULL,
+      password TEXT NOT NULL,
       name TEXT NOT NULL,
       whatsappNumber TEXT NOT NULL
     );
@@ -20,9 +22,11 @@ async function initializeDb(db) {
   const lookbookSchema = `
     CREATE TABLE IF NOT EXISTS lookbooks (
       id TEXT PRIMARY KEY NOT NULL,
+      userId INTEGER NOT NULL,
       title TEXT NOT NULL,
       description TEXT,
-      createdAt TEXT NOT NULL
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
     );
   `;
 
@@ -37,7 +41,7 @@ async function initializeDb(db) {
     );
   `;
 
-  await db.exec(profileSchema);
+  await db.exec(userSchema);
   await db.exec(lookbookSchema);
   await db.exec(itemsSchema);
   console.log("Database initialized successfully.");

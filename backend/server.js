@@ -1,41 +1,87 @@
 const express = require('express');
 const cors = require('cors');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { openDb, initializeDb } = require('./database');
-const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-key-change-it';
 
 // Middlewares
 app.use(cors());
-// Aumenta o limite do payload para acomodar as imagens em base64
 app.use(express.json({ limit: '50mb' }));
 
 let db;
 
+// --- Auth Middleware ---
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token == null) return res.sendStatus(401);
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.sendStatus(403);
+        req.user = user;
+        next();
+    });
+};
+
+
 // --- API Endpoints ---
 
-// PROFILE
-app.get('/api/profile', async (req, res) => {
+// AUTH
+app.post('/api/auth/register', async (req, res) => {
+    const { name, whatsappNumber, email, password } = req.body;
+    if (!email || !password || !name || !whatsappNumber) {
+        return res.status(400).json({ error: 'All fields are required.' });
+    }
     try {
-        const profile = await db.get('SELECT * FROM profiles WHERE id = 1');
-        res.json(profile || { name: '', whatsappNumber: '' });
+        const existingUser = await db.get('SELECT * FROM users WHERE email = ?', email);
+        if (existingUser) {
+            return res.status(409).json({ error: 'Email already in use.' });
+        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const result = await db.run('INSERT INTO users (name, whatsappNumber, email, password) VALUES (?, ?, ?, ?)', name, whatsappNumber, email, hashedPassword);
+        res.status(201).json({ id: result.lastID, email });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.post('/api/profile', async (req, res) => {
-    const { name, whatsappNumber } = req.body;
-    if (!name || !whatsappNumber) {
-        return res.status(400).json({ error: 'Name and WhatsApp number are required.' });
-    }
+app.post('/api/auth/login', async (req, res) => {
+    const { email, password } = req.body;
     try {
-        // Usamos INSERT OR REPLACE para simplificar: cria se não existir, atualiza se existir.
-        const stmt = await db.prepare('INSERT OR REPLACE INTO profiles (id, name, whatsappNumber) VALUES (1, ?, ?)');
-        await stmt.run(name, whatsappNumber);
-        await stmt.finalize();
-        const profile = await db.get('SELECT * FROM profiles WHERE id = 1');
+        const user = await db.get('SELECT * FROM users WHERE email = ?', email);
+        if (!user) {
+            return res.status(400).json({ error: 'Invalid credentials.' });
+        }
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ error: 'Invalid credentials.' });
+        }
+        const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '1d' });
+        res.json({ token, user: { id: user.id, name: user.name, email: user.email, whatsappNumber: user.whatsappNumber } });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// PROFILE (Protected)
+app.get('/api/profile', authenticateToken, async (req, res) => {
+    try {
+        const profile = await db.get('SELECT id, name, email, whatsappNumber FROM users WHERE id = ?', req.user.id);
+        res.json(profile);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/profile', authenticateToken, async (req, res) => {
+    const { name, whatsappNumber } = req.body;
+    try {
+        await db.run('UPDATE users SET name = ?, whatsappNumber = ? WHERE id = ?', name, whatsappNumber, req.user.id);
+        const profile = await db.get('SELECT id, name, email, whatsappNumber FROM users WHERE id = ?', req.user.id);
         res.status(200).json(profile);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -43,11 +89,11 @@ app.post('/api/profile', async (req, res) => {
 });
 
 
-// LOOKBOOKS
-app.get('/api/lookbooks', async (req, res) => {
+// LOOKBOOKS (Protected)
+app.get('/api/lookbooks', authenticateToken, async (req, res) => {
     try {
-        const lookbooksRows = await db.all('SELECT * FROM lookbooks ORDER BY createdAt DESC');
-        const itemsRows = await db.all('SELECT * FROM lookbook_items');
+        const lookbooksRows = await db.all('SELECT * FROM lookbooks WHERE userId = ? ORDER BY createdAt DESC', req.user.id);
+        const itemsRows = await db.all('SELECT * FROM lookbook_items WHERE lookbookId IN (SELECT id FROM lookbooks WHERE userId = ?)', req.user.id);
 
         const lookbooks = lookbooksRows.map(lb => ({
             ...lb,
@@ -60,8 +106,9 @@ app.get('/api/lookbooks', async (req, res) => {
     }
 });
 
-app.post('/api/lookbooks', async (req, res) => {
+app.post('/api/lookbooks', authenticateToken, async (req, res) => {
     const { title, description, items } = req.body;
+    const userId = req.user.id;
     if (!title || !items || items.length === 0) {
         return res.status(400).json({ error: 'Title and at least one item are required.' });
     }
@@ -72,8 +119,8 @@ app.post('/api/lookbooks', async (req, res) => {
     try {
         await db.run('BEGIN TRANSACTION');
 
-        const lookbookStmt = await db.prepare('INSERT INTO lookbooks (id, title, description, createdAt) VALUES (?, ?, ?, ?)');
-        await lookbookStmt.run(lookbookId, title, description, createdAt);
+        const lookbookStmt = await db.prepare('INSERT INTO lookbooks (id, userId, title, description, createdAt) VALUES (?, ?, ?, ?, ?)');
+        await lookbookStmt.run(lookbookId, userId, title, description, createdAt);
         await lookbookStmt.finalize();
 
         const itemStmt = await db.prepare('INSERT INTO lookbook_items (id, lookbookId, imageUrl, name, price) VALUES (?, ?, ?, ?, ?)');
@@ -93,7 +140,7 @@ app.post('/api/lookbooks', async (req, res) => {
     }
 });
 
-// Endpoint for Client View - returns lookbook and shopper profile together
+// Endpoint for Client View (Public)
 app.get('/api/lookbook-details/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -104,7 +151,7 @@ app.get('/api/lookbook-details/:id', async (req, res) => {
         }
 
         const items = await db.all('SELECT * FROM lookbook_items WHERE lookbookId = ?', id);
-        const profile = await db.get('SELECT name, whatsappNumber FROM profiles WHERE id = 1');
+        const profile = await db.get('SELECT name, whatsappNumber FROM users WHERE id = ?', lookbookRow.userId);
 
         const lookbook = { ...lookbookRow, items };
         const shopperProfile = profile || { name: 'Personal Shopper', whatsappNumber: '' };
