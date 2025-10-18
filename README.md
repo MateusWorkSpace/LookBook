@@ -5,7 +5,7 @@
 
 cd backend
 npm install
-npm stat
+npm start
 
 1. Install dependencies:
    `npm install`
