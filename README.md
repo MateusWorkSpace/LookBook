@@ -4,6 +4,7 @@
 **Prerequisites:**  Node.js
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 0. Backend Server:
 
@@ -11,6 +12,8 @@ cd backend
 npm install
 npm start
 
+=======
+>>>>>>> 0d971d0 (New Landing Page:)
 
 1. Install dependencies:
    `npm install`
@@ -18,7 +21,10 @@ npm start
 3. Run the app:
    `npm run dev`
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 
 MateusDang
 
+=======
+>>>>>>> 0d971d0 (New Landing Page:)

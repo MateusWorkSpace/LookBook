@@ -9,11 +9,12 @@ import EditLookbook from './views/EditLookbook';
 import LookbookClientView from './views/LookbookClientView';
 import Login from './views/Login';
 import Register from './views/Register';
+import Landing from './views/Landing';
 
 export const API_BASE_URL = 'http://localhost:3001/api';
 
 const App: React.FC = () => {
-  const [view, setView] = useState('login'); // e.g., 'dashboard', 'settings', 'create', 'edit/:id', 'view/:id'
+  const [view, setView] = useState('landing'); // e.g., 'dashboard', 'settings', 'create', 'edit/:id', 'view/:id'
   const [currentLookbookId, setCurrentLookbookId] = useState<string | null>(null);
   const [token, setToken] = useLocalStorage<string | null>('token', null);
   const [profile, setProfile] = useState<ShopperProfile | null>(null);
@@ -95,12 +96,13 @@ const App: React.FC = () => {
         navigate('view', id);
     } else if (token) {
         if (!profile) fetchProfile();
-        if (view === 'login' || view === 'register') {
+        if (['landing', 'login', 'register'].includes(view)) {
           navigate('dashboard');
         }
     } else {
-        if (view !== 'register') {
-          navigate('login');
+        const publicViews = ['landing', 'login', 'register'];
+        if (!publicViews.includes(view) && !view.startsWith('view')) {
+            navigate('landing');
         }
     }
   }, [token, profile, view, fetchProfile]);
@@ -110,10 +112,16 @@ const App: React.FC = () => {
   }
 
   if (!token) {
-    if (view === 'register') {
-      return <Register navigate={navigate} />;
+    switch (view) {
+        case 'landing':
+            return <Landing navigate={navigate} />;
+        case 'register':
+            return <Register navigate={navigate} />;
+        case 'login':
+            return <Login setToken={setToken} navigate={navigate} />;
+        default:
+            return <Landing navigate={navigate} />;
     }
-    return <Login setToken={setToken} navigate={navigate} />;
   }
 
   if (!profile) {

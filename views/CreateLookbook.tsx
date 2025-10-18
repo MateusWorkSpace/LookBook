@@ -18,7 +18,8 @@ const CreateLookbook: React.FC<CreateLookbookProps> = ({ addLookbook, navigate }
     if (e.target.files) {
       setIsLoading(true);
       const files = Array.from(e.target.files);
-      const newItemsPromises = files.map(file => {
+      // FIX: Explicitly type `file` as `File` to fix TypeScript inference issue.
+      const newItemsPromises = files.map((file: File) => {
         // FIX: Generate a temporary unique ID for new items, consistent with EditLookbook.
         return new Promise<LookbookItem>((resolve, reject) => {
           const reader = new FileReader();

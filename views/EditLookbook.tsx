@@ -46,7 +46,8 @@ const EditLookbook: React.FC<EditLookbookProps> = ({ lookbookId, navigate, token
     if (e.target.files) {
       setIsLoading(true);
       const files = Array.from(e.target.files);
-      const newItemsPromises = files.map(file => {
+      // FIX: Explicitly type `file` as `File` to fix TypeScript inference issue.
+      const newItemsPromises = files.map((file: File) => {
         return new Promise<LookbookItem>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (event) => {

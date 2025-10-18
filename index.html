@@ -7,6 +7,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LuxeLink Digital Lookbook</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
     <script>
       tailwind.config = {
         theme: {
@@ -18,7 +21,23 @@
               'brand-bg-gray': '#F0F2F5',
               'brand-chat-bg': '#E5DDD5',
               'brand-light-gray': '#F7F7F7',
+              'luxelink': {
+                '50': '#f0fdfa',
+                '100': '#ccfbf1',
+                '200': '#99f6e4',
+                '300': '#5eead4',
+                '400': '#2dd4bf',
+                '500': '#14b8a6',
+                '600': '#0d9488',
+                '700': '#0f766e',
+                '800': '#115e59',
+                '900': '#134e4a',
+                '950': '#042f2e',
+              }
             },
+            fontFamily: {
+              tajawal: ['Tajawal', 'sans-serif'],
+            }
           },
         },
       }
@@ -35,7 +54,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-brand-bg-gray">
+  <body>
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
