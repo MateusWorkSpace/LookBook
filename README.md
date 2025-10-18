@@ -1,9 +1,15 @@
 # Lookbook LuxeLink
 
+<<<<<<< HEAD
 Criado por **MateusDang**.
+=======
+
+## Run Locally
+>>>>>>> e491abbb4b9dc99d991a058801f9ac473d5f0969
 
 ## Descrição
 
+<<<<<<< HEAD
 O Lookbook LuxeLink é uma aplicação web elegante projetada para personal shoppers de luxo e boutiques. A ferramenta permite a criação e o compartilhamento de lookbooks digitais privados e temporários com clientes VIP. O objetivo é otimizar a comunicação com o cliente, substituindo o compartilhamento caótico de fotos por uma experiência de "revista digital" profissional, organizada e interativa.
 
 ## Funcionalidades Principais
@@ -105,3 +111,18 @@ O frontend é uma aplicação React que consome a API do backend.
 5.  Adicione imagens e detalhes aos seus itens.
 6.  Salve o lookbook e, na dashboard, clique no ícone de compartilhar para obter o link do cliente.
 7.  Para testar a monetização, clique no banner de "Upgrade" para ser redirecionado ao checkout do Stripe.
+=======
+0. Backend Server:
+
+cd backend
+npm install
+npm stat
+
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`
+
+MateusDang
+>>>>>>> e491abbb4b9dc99d991a058801f9ac473d5f0969
