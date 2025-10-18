@@ -1,12 +1,3 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
-# Run and deploy your AI Studio app
-
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/drive/18hQWjkxIGxRfOsgvRau4xnTMxsVrYT-1
 
 ## Run Locally
 
@@ -19,7 +10,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/18hQWjkxIGxRfOsgvRau4xn
 cd backend
 npm install
 npm start
->>>>>>> 84b7bcafac15c952b10d786052979ae5b3d193e4
+
 
 1. Install dependencies:
    `npm install`
@@ -30,4 +21,4 @@ npm start
 =======
 
 MateusDang
->>>>>>> 84b7bcafac15c952b10d786052979ae5b3d193e4
+
