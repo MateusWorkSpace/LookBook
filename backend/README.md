@@ -39,6 +39,3 @@ Ao ser iniciado pela primeira vez, ele criará automaticamente um arquivo de ban
 -   `GET /api/lookbooks`: Obtém uma lista de todos os lookbooks.
 -   `POST /api/lookbooks`: Cria um novo lookbook.
 -   `GET /api/lookbook-details/:id`: Obtém os detalhes de um lookbook específico junto com o perfil do shopper (usado pela visualização do cliente).
-
-
-MateusDang

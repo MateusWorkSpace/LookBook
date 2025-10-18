@@ -1,14 +1,9 @@
 
-export interface ShopperProfile {
-  name: string;
-  whatsappNumber: string;
-}
-
 export interface LookbookItem {
   id: string;
   imageUrl: string;
   name: string;
-  price?: string;
+  price: string;
 }
 
 export interface Lookbook {
@@ -17,4 +12,11 @@ export interface Lookbook {
   description: string;
   items: LookbookItem[];
   createdAt: string;
+  shareableLink?: string;
+}
+
+export interface ShopperProfile {
+  name: string;
+  whatsappNumber: string;
+  email: string;
 }

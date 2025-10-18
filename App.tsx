@@ -1,180 +1,155 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { ShopperProfile, Lookbook } from './types';
+import useLocalStorage from './hooks/useLocalStorage';
+import type { Lookbook, ShopperProfile } from './types';
+
 import Dashboard from './views/Dashboard';
 import Settings from './views/Settings';
 import CreateLookbook from './views/CreateLookbook';
+import EditLookbook from './views/EditLookbook';
 import LookbookClientView from './views/LookbookClientView';
 import Login from './views/Login';
 import Register from './views/Register';
-import { Logo, DashboardIcon, SettingsIcon, LogoutIcon } from './components/icons';
 
 export const API_BASE_URL = 'http://localhost:3001/api';
 
 const App: React.FC = () => {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [view, setView] = useState('login'); // e.g., 'dashboard', 'settings', 'create', 'edit/:id', 'view/:id'
+  const [currentLookbookId, setCurrentLookbookId] = useState<string | null>(null);
+  const [token, setToken] = useLocalStorage<string | null>('token', null);
   const [profile, setProfile] = useState<ShopperProfile | null>(null);
-  const [lookbooks, setLookbooks] = useState<Lookbook[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentView, setCurrentView] = useState('dashboard');
-  const [activeLookbookId, setActiveLookbookId] = useState<string | null>(null);
 
-  const getAuthHeader = useCallback(() => {
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
-  }, [token]);
+  const navigate = (newView: string, id: string | null = null) => {
+    setCurrentLookbookId(id);
+    setView(newView);
+  };
 
-  const logout = () => {
+  const handleLogout = useCallback(() => {
     setToken(null);
     setProfile(null);
-    setLookbooks([]);
-    localStorage.removeItem('token');
-    window.location.hash = 'login';
-  };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const [profileRes, lookbooksRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/profile`, { headers: getAuthHeader() }),
-          fetch(`${API_BASE_URL}/lookbooks`, { headers: getAuthHeader() }),
-        ]);
-
-        if (profileRes.status === 401 || profileRes.status === 403) {
-            logout();
-            return;
-        }
-
-        const profileData = await profileRes.json();
-        const lookbooksData = await lookbooksRes.json();
-        setProfile(profileData);
-        setLookbooks(lookbooksData);
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-        logout();
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-  }, [token, getAuthHeader]);
-
-  const handleHashChange = useCallback(() => {
-    const hash = window.location.hash.replace('#', '');
-    if (hash.startsWith('lookbook/')) {
-      const id = hash.split('/')[1];
-      setActiveLookbookId(id);
-      setCurrentView('client-view');
-    } else if (['login', 'register'].includes(hash) && token) {
-        window.location.hash = 'dashboard';
-    } else {
-      setActiveLookbookId(null);
-      setCurrentView(hash || (token ? 'dashboard' : 'login'));
-    }
-  }, [token]);
-
-  useEffect(() => {
-    window.addEventListener('hashchange', handleHashChange);
-    handleHashChange();
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [handleHashChange]);
-
-  const navigate = (view: string) => {
-    window.location.hash = view;
-  };
-
-  const updateProfile = async (newProfile: ShopperProfile) => {
+    navigate('login');
+  }, [setToken]);
+  
+  const fetchProfile = useCallback(async () => {
+    if (!token) return;
     try {
       const response = await fetch(`${API_BASE_URL}/profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.status === 401) {
+        handleLogout();
+        return;
+      }
+      if (!response.ok) throw new Error('Failed to fetch profile');
+      const data = await response.json();
+      setProfile(data);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      handleLogout();
+    }
+  }, [token, handleLogout]);
+
+  const updateProfile = async (newProfile: ShopperProfile) => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(newProfile),
       });
-      const updatedProfile = await response.json();
-      setProfile(updatedProfile);
+      if (!response.ok) throw new Error('Failed to update profile');
+      const data = await response.json();
+      setProfile(data);
     } catch (error) {
-      console.error('Failed to update profile:', error);
+      console.error('Error updating profile:', error);
     }
   };
 
-  const addLookbook = async (lookbook: Omit<Lookbook, 'id' | 'createdAt'>) => {
+  const addLookbook = async (lookbook: Omit<Lookbook, 'id' | 'createdAt' | 'shareableLink'>) => {
+    if (!token) return;
     try {
       const response = await fetch(`${API_BASE_URL}/lookbooks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(lookbook),
       });
-      const newLookbook = await response.json();
-      setLookbooks(prevLookbooks => [newLookbook, ...prevLookbooks]);
+      if (!response.ok) {
+        throw new Error('Failed to create lookbook');
+      }
+      // No need to do anything with the response, dashboard will refetch.
     } catch (error) {
-      console.error('Failed to create lookbook:', error);
+      console.error(error);
+      alert('Error creating lookbook');
     }
-  };
-
-  if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Carregando...</div>;
   }
-  
-  if (currentView === 'client-view' && activeLookbookId) {
-      return <LookbookClientView lookbookId={activeLookbookId} />;
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/lookbook/')) {
+        const id = path.split('/')[2];
+        navigate('view', id);
+    } else if (token) {
+        if (!profile) fetchProfile();
+        if (view === 'login' || view === 'register') {
+          navigate('dashboard');
+        }
+    } else {
+        if (view !== 'register') {
+          navigate('login');
+        }
+    }
+  }, [token, profile, view, fetchProfile]);
+
+  if (view.startsWith('view')) {
+    return <LookbookClientView lookbookId={currentLookbookId} />;
   }
 
   if (!token) {
-    if (currentView === 'register') {
-        return <Register navigate={navigate} />
+    if (view === 'register') {
+      return <Register navigate={navigate} />;
     }
-    return <Login setToken={setToken} navigate={navigate} />
+    return <Login setToken={setToken} navigate={navigate} />;
   }
 
   if (!profile) {
-      return <div className="flex items-center justify-center min-h-screen">Carregando perfil...</div>;
+    return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
   }
-
-  const isSettingsIncomplete = !profile.name || !profile.whatsappNumber;
+  
+  const renderView = () => {
+    switch (view) {
+      case 'dashboard':
+        return <Dashboard navigate={navigate} token={token} />;
+      case 'settings':
+        return <Settings profile={profile} setProfile={updateProfile} />;
+      case 'create':
+        return <CreateLookbook navigate={navigate} addLookbook={addLookbook} />;
+      case 'edit':
+        return <EditLookbook lookbookId={currentLookbookId} navigate={navigate} token={token} />;
+      default:
+        return <Dashboard navigate={navigate} token={token} />;
+    }
+  };
 
   return (
-    <div className="min-h-screen flex">
-      <nav className="w-64 bg-brand-dark-green text-white flex flex-col p-4 justify-between">
-        <div>
-          <div className="mb-10">
-            <Logo />
-          </div>
-          <ul>
-            <li>
-              <button onClick={() => navigate('dashboard')} className={`flex items-center w-full text-left p-3 rounded-lg transition-colors ${currentView === 'dashboard' ? 'bg-brand-teal-green' : 'hover:bg-brand-teal-green/50'}`}>
-                <DashboardIcon className="mr-3" />
-                Dashboard
-              </button>
-            </li>
-            <li className="mt-2">
-              <button onClick={() => navigate('settings')} className={`flex items-center w-full text-left p-3 rounded-lg transition-colors ${currentView === 'settings' ? 'bg-brand-teal-green' : 'hover:bg-brand-teal-green/50'}`}>
-                <SettingsIcon className="mr-3" />
-                Configurações
-              </button>
-            </li>
-          </ul>
-        </div>
-        <div>
-           <button onClick={logout} className={`flex items-center w-full text-left p-3 rounded-lg transition-colors hover:bg-brand-teal-green/50`}>
-              <LogoutIcon className="mr-3" />
-              Sair
-            </button>
-        </div>
-      </nav>
-      <main className="flex-1 p-8 overflow-y-auto">
-        {isSettingsIncomplete && currentView !== 'settings' && (
-          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6" role="alert">
-            <p className="font-bold">Perfil Incompleto</p>
-            <p>Por favor, complete seu nome e número do WhatsApp na página de <button onClick={() => navigate('settings')} className="font-bold underline">Configurações</button> para poder compartilhar seus lookbooks.</p>
-          </div>
-        )}
-        {currentView === 'dashboard' && <Dashboard lookbooks={lookbooks} navigate={navigate} profile={profile} />}
-        {currentView === 'settings' && <Settings profile={profile} setProfile={updateProfile} />}
-        {currentView === 'create' && <CreateLookbook addLookbook={addLookbook} navigate={navigate} />}
-      </main>
+    <div className="min-h-screen bg-brand-bg-gray text-gray-800 font-sans">
+        <header className="bg-white shadow-sm sticky top-0 z-10">
+            <nav className="container mx-auto px-6 py-3 flex justify-between items-center">
+                <h1 className="text-xl font-bold text-brand-teal-green">Lookbook Creator</h1>
+                <div>
+                    <button onClick={() => navigate('dashboard')} className="px-4 py-2 text-gray-600 hover:text-brand-teal-green rounded-md font-medium">Dashboard</button>
+                    <button onClick={() => navigate('settings')} className="px-4 py-2 text-gray-600 hover:text-brand-teal-green rounded-md font-medium">Configurações</button>
+                    <button onClick={handleLogout} className="px-4 py-2 text-gray-600 hover:text-brand-teal-green rounded-md font-medium">Sair</button>
+                </div>
+            </nav>
+        </header>
+        <main className="container mx-auto px-6 py-8">
+            {renderView()}
+        </main>
     </div>
   );
 };

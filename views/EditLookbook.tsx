@@ -1,30 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Lookbook, LookbookItem } from '../types';
+import { API_BASE_URL } from '../App';
 import { BackIcon } from '../components/icons';
 
-interface CreateLookbookProps {
-  addLookbook: (lookbook: Omit<Lookbook, 'id' | 'createdAt' | 'shareableLink'>) => Promise<void>;
+interface EditLookbookProps {
+  lookbookId: string | null;
   navigate: (view: string) => void;
+  token: string;
 }
 
-const CreateLookbook: React.FC<CreateLookbookProps> = ({ addLookbook, navigate }) => {
+const EditLookbook: React.FC<EditLookbookProps> = ({ lookbookId, navigate, token }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  // FIX: Change items state to hold LookbookItem[] to align with prop types.
   const [items, setItems] = useState<LookbookItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+
+  useEffect(() => {
+    const fetchLookbook = async () => {
+      if (!lookbookId) {
+        navigate('dashboard');
+        return;
+      }
+      try {
+        const response = await fetch(`${API_BASE_URL}/lookbooks/${lookbookId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch lookbook data');
+        const data: Lookbook = await response.json();
+        setTitle(data.title);
+        setDescription(data.description);
+        setItems(data.items);
+      } catch (error) {
+        console.error(error);
+        alert('Could not load lookbook for editing.');
+        navigate('dashboard');
+      } finally {
+        setIsFetching(false);
+      }
+    };
+    fetchLookbook();
+  }, [lookbookId, navigate, token]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setIsLoading(true);
       const files = Array.from(e.target.files);
       const newItemsPromises = files.map(file => {
-        // FIX: Generate a temporary unique ID for new items, consistent with EditLookbook.
         return new Promise<LookbookItem>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (event) => {
             resolve({
-              id: `new_${Date.now()}_${Math.random()}`,
+              id: `new_${Date.now()}_${Math.random()}`, // temp id for new items
               imageUrl: event.target?.result as string,
               name: '',
               price: '',
@@ -62,10 +89,41 @@ const CreateLookbook: React.FC<CreateLookbookProps> = ({ addLookbook, navigate }
         alert("Por favor, adicione um título e pelo menos uma imagem.");
         return;
     }
-    // This call is now type-correct as `items` is LookbookItem[]
-    await addLookbook({ title, description, items });
-    navigate('dashboard');
+    
+    const lookbookData = {
+        title,
+        description,
+        items: items.map(({ id, ...rest }) => ({
+            ...rest,
+            // if id is not from the db, it's a new item without id
+            ...(id.startsWith('new_') ? {} : { id }),
+        }))
+    };
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/lookbooks/${lookbookId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(lookbookData)
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to update lookbook');
+        }
+
+        navigate('dashboard');
+    } catch (error) {
+        console.error(error);
+        alert('Error updating lookbook');
+    }
   };
+
+  if (isFetching) {
+    return <div>Carregando editor...</div>;
+  }
 
   return (
     <div>
@@ -73,7 +131,7 @@ const CreateLookbook: React.FC<CreateLookbookProps> = ({ addLookbook, navigate }
         <button onClick={() => navigate('dashboard')} className="p-2 rounded-full hover:bg-gray-200 mr-4">
           <BackIcon />
         </button>
-        <h1 className="text-3xl font-bold text-gray-800">Criar Novo Lookbook</h1>
+        <h1 className="text-3xl font-bold text-gray-800">Editar Lookbook</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -95,7 +153,7 @@ const CreateLookbook: React.FC<CreateLookbookProps> = ({ addLookbook, navigate }
             <h2 className="text-xl font-bold text-gray-800 mb-4">Itens do Lookbook</h2>
             <div>
               <label htmlFor="image-upload" className="w-full cursor-pointer bg-brand-light-gray border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center p-6 text-center hover:bg-gray-100 transition-colors">
-                <span className="text-brand-teal-green font-semibold">Clique para carregar as imagens</span>
+                <span className="text-brand-teal-green font-semibold">Clique para adicionar mais imagens</span>
                 <span className="text-sm text-gray-500 mt-1">PNG, JPG, GIF até 10MB</span>
                 <input id="image-upload" type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} />
               </label>
@@ -104,11 +162,10 @@ const CreateLookbook: React.FC<CreateLookbookProps> = ({ addLookbook, navigate }
             
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {items.map((item, index) => (
-                    // FIX: Use the item's unique temporary ID as the key for better React performance.
                     <div key={item.id} className="border rounded-lg p-4 space-y-3 relative">
                         <button type="button" onClick={() => removeItem(index)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold">&times;</button>
                         <img src={item.imageUrl} alt="preview" className="w-full h-40 object-cover rounded-md"/>
-                        <input type="text" placeholder="Nome do item" value={item.name} onChange={(e) => updateItem(index, 'name', e.target.value)} className="w-full text-sm px-2 py-1 border border-gray-300 rounded-md" required />
+                        <input type="text" placeholder="Nome do item" value={item.name} onChange={(e) => updateItem(index, 'name', e.target.value)} className="w-full text-sm px-2 py-1 border border-gray-300 rounded-md" required/>
                         <input type="text" placeholder="Preço (opcional)" value={item.price} onChange={(e) => updateItem(index, 'price', e.target.value)} className="w-full text-sm px-2 py-1 border border-gray-300 rounded-md" />
                     </div>
                 ))}
@@ -116,8 +173,8 @@ const CreateLookbook: React.FC<CreateLookbookProps> = ({ addLookbook, navigate }
         </div>
 
         <div className="flex justify-end">
-          <button type="submit" className="bg-brand-teal-green text-white px-6 py-3 rounded-lg font-semibold hover:bg-brand-dark-green transition-colors disabled:bg-gray-400" disabled={isLoading}>
-            Salvar Lookbook
+          <button type="submit" className="bg-brand-teal-green text-white px-6 py-3 rounded-lg font-semibold hover:bg-brand-dark-green transition-colors disabled:bg-gray-400" disabled={isLoading || isFetching}>
+            Salvar Alterações
           </button>
         </div>
       </form>
@@ -125,4 +182,4 @@ const CreateLookbook: React.FC<CreateLookbookProps> = ({ addLookbook, navigate }
   );
 };
 
-export default CreateLookbook;
+export default EditLookbook;

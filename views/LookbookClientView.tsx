@@ -1,121 +1,131 @@
 import React, { useState, useEffect } from 'react';
-import type { Lookbook, ShopperProfile } from '../types';
-import { WhatsAppIcon } from '../components/icons';
-
-const API_BASE_URL = 'http://localhost:3001/api';
+import type { Lookbook, ShopperProfile, LookbookItem } from '../types';
+import { API_BASE_URL } from '../App';
+import { Logo } from '../components/icons';
+// FIX: Import GoogleGenAI from @google/genai
+import { GoogleGenAI } from '@google/genai';
 
 interface LookbookClientViewProps {
-  lookbookId: string;
-}
-
-const ItemCard: React.FC<{
-    imageUrl: string;
-    name: string;
-    price?: string;
-    whatsappLink: string;
-}> = ({ imageUrl, name, price, whatsappLink }) => {
-    return (
-        <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="block group bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300">
-            <div className="relative">
-                <img src={imageUrl} alt={name} className="w-full h-80 object-cover" />
-                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 flex items-center justify-center">
-                    <div className="transform scale-0 group-hover:scale-100 transition-transform duration-300 flex items-center bg-brand-light-green text-white font-bold py-3 px-5 rounded-full">
-                        <WhatsAppIcon className="w-6 h-6 mr-2" />
-                        Tenho interesse
-                    </div>
-                </div>
-            </div>
-            <div className="p-4">
-                <h3 className="text-lg font-semibold text-gray-800 truncate">{name || "Item sem nome"}</h3>
-                {price && <p className="text-md text-gray-600 mt-1">{price}</p>}
-            </div>
-        </a>
-    );
+  lookbookId: string | null;
 }
 
 const LookbookClientView: React.FC<LookbookClientViewProps> = ({ lookbookId }) => {
   const [lookbook, setLookbook] = useState<Lookbook | null>(null);
-  const [shopperProfile, setShopperProfile] = useState<ShopperProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<ShopperProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedItem, setSelectedItem] = useState<LookbookItem | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedMessage, setGeneratedMessage] = useState('');
 
   useEffect(() => {
-    const fetchLookbookData = async () => {
-      setIsLoading(true);
-      setError(null);
+    const fetchLookbook = async () => {
+      if (!lookbookId) {
+        setError("ID do Lookbook não fornecido.");
+        setLoading(false);
+        return;
+      }
       try {
-        const response = await fetch(`${API_BASE_URL}/lookbook-details/${lookbookId}`);
+        const response = await fetch(`${API_BASE_URL}/lookbooks/public/${lookbookId}`);
         if (!response.ok) {
-          throw new Error('Lookbook not found');
+          throw new Error('Lookbook não encontrado ou falha ao carregar.');
         }
-        const { lookbook, shopperProfile } = await response.json();
-        setLookbook(lookbook);
-        setShopperProfile(shopperProfile);
+        const data = await response.json();
+        setLookbook(data.lookbook);
+        setProfile(data.profile);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        setError(err instanceof Error ? err.message : 'Ocorreu um erro');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    if (lookbookId) {
-      fetchLookbookData();
-    }
+    fetchLookbook();
   }, [lookbookId]);
 
-
-  const generateWhatsAppLink = (itemName: string) => {
-    if (!shopperProfile || !lookbook) return '#';
-    const message = `Olá, tenho interesse neste item: ${itemName} da coleção '${lookbook.title}'.`;
-    const encodedMessage = encodeURIComponent(message);
-    return `https://wa.me/${shopperProfile.whatsappNumber}?text=${encodedMessage}`;
+  const handleItemSelection = (item: LookbookItem) => {
+    setSelectedItem(prev => (prev?.id === item.id ? null : item));
+    setGeneratedMessage('');
   };
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen"><p>Carregando Lookbook...</p></div>;
-  }
+  const generateMessage = async () => {
+    if (!selectedItem || !profile || !lookbook) return;
 
-  if (error || !lookbook || !shopperProfile) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-800">404</h1>
-          <p className="text-xl text-gray-600 mt-2">Lookbook não encontrado.</p>
-        </div>
-      </div>
-    );
-  }
+    setIsGenerating(true);
+    setGeneratedMessage('');
+
+    try {
+        // FIX: Update to use the recommended API initialization and method call
+        const ai = new GoogleGenAI({apiKey: process.env.API_KEY!});
+        
+        const prompt = `Gere uma mensagem curta e amigável em Português para um cliente interessado no item "${selectedItem.name}" do lookbook "${lookbook.title}" da loja de ${profile.name}. O preço é ${selectedItem.price || 'a consultar'}. A mensagem deve ser para iniciar uma conversa no WhatsApp para finalizar a compra.`;
+        
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+        });
+
+        const text = response.text;
+        
+        const whatsappLink = `https://wa.me/${profile.whatsappNumber}?text=${encodeURIComponent(text + `\n\nEstou interessado(a) neste item: ${selectedItem.imageUrl}`)}`;
+        setGeneratedMessage(whatsappLink);
+
+    } catch (err) {
+        console.error("Error generating message:", err);
+        alert("Falha ao gerar a mensagem. Tente novamente.");
+    } finally {
+        setIsGenerating(false);
+    }
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Carregando Lookbook...</div>;
+  if (error) return <div className="min-h-screen flex items-center justify-center text-red-500">{error}</div>;
+  if (!lookbook || !profile) return <div className="min-h-screen flex items-center justify-center">Lookbook não encontrado.</div>;
 
   return (
-    <div className="min-h-screen bg-brand-light-gray">
-      <header className="bg-white shadow-md p-6">
-        <div className="max-w-5xl mx-auto">
-          <h1 className="text-4xl font-bold text-brand-dark-green tracking-tight">{lookbook.title}</h1>
-          {lookbook.description && <p className="text-lg text-gray-600 mt-2">{lookbook.description}</p>}
-          <p className="text-sm text-gray-500 mt-4">Apresentado por: <span className="font-semibold">{shopperProfile.name || 'Seu Personal Shopper'}</span></p>
+    <div className="min-h-screen bg-brand-bg-gray font-sans">
+      <header className="bg-white p-4 shadow-md text-center">
+        <div className="flex items-center justify-center space-x-3">
+          <Logo />
+          <h1 className="text-2xl font-bold text-gray-800">{lookbook.title}</h1>
         </div>
+        <p className="text-gray-600 mt-1">por {profile.name}</p>
       </header>
-      <main className="max-w-5xl mx-auto p-6">
-        {lookbook.items.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {lookbook.items.map(item => (
-              <ItemCard 
-                key={item.id} 
-                imageUrl={item.imageUrl}
-                name={item.name}
-                price={item.price}
-                whatsappLink={generateWhatsAppLink(item.name)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-20">
-            <p className="text-gray-500">Este lookbook ainda não possui itens.</p>
+
+      <main className="container mx-auto p-4 md:p-8">
+        {lookbook.description && <p className="text-center text-lg text-gray-700 mb-8">{lookbook.description}</p>}
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {lookbook.items.map(item => (
+            <div key={item.id} className={`bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer transition-all duration-300 ${selectedItem?.id === item.id ? 'ring-4 ring-brand-teal-green' : ''}`} onClick={() => handleItemSelection(item)}>
+              <img src={item.imageUrl} alt={item.name} className="w-full h-64 object-cover" />
+              <div className="p-4">
+                <h3 className="font-bold text-lg">{item.name}</h3>
+                {item.price && <p className="text-gray-600">{item.price}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {selectedItem && (
+          <div className="mt-10 p-6 bg-white rounded-xl shadow-lg text-center max-w-2xl mx-auto">
+            <h2 className="text-xl font-bold mb-4">Tenho interesse!</h2>
+            <p className="mb-4 text-gray-700">Gostou do item "{selectedItem.name}"? Clique no botão abaixo para gerar uma mensagem e iniciar uma conversa no WhatsApp para finalizar sua compra.</p>
+            <button onClick={generateMessage} disabled={isGenerating} className="bg-brand-teal-green text-white px-6 py-3 rounded-lg font-semibold hover:bg-brand-dark-green transition-colors disabled:bg-gray-400">
+              {isGenerating ? 'Gerando mensagem...' : 'Falar com Vendedor(a)'}
+            </button>
+            {generatedMessage && (
+              <div className="mt-4 text-left p-4 bg-gray-100 rounded-md">
+                <p className="mb-2">Mensagem gerada! Clique no link para abrir no WhatsApp:</p>
+                <a href={generatedMessage} target="_blank" rel="noopener noreferrer" className="text-brand-teal-green font-bold break-all hover:underline">{generatedMessage}</a>
+              </div>
+            )}
           </div>
         )}
       </main>
-      <footer className="text-center p-6 text-gray-400 text-sm">
-        <p>Powered by LuxeLink</p>
+
+      <footer className="text-center p-4 mt-8 text-gray-500 text-sm">
+        <p>Powered by Lookbook Creator</p>
       </footer>
     </div>
   );
