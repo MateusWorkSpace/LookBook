@@ -1,14 +1,7 @@
-# Lookbook LuxeLink
-
+![Lookbook](https://i.imgur.com/vBvSfNo.png) 
 
 Criado por **MateusDang**.
 =======
-
-## Run Locally
-
-
-## Descrição
-
 
 O Lookbook LuxeLink é uma aplicação web elegante projetada para personal shoppers de luxo e boutiques. A ferramenta permite a criação e o compartilhamento de lookbooks digitais privados e temporários com clientes VIP. O objetivo é otimizar a comunicação com o cliente, substituindo o compartilhamento caótico de fotos por uma experiência de "revista digital" profissional, organizada e interativa.
 
